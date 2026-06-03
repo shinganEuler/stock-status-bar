@@ -1,0 +1,165 @@
+{
+  "name": "stock-status-bar",
+  "displayName": "VSC Stock Status Bar",
+  "description": "在 VS Code 状态栏显示股票实时行情的精简插件",
+  "version": "0.1.4",
+  "publisher": "local",
+  "license": "BSD-3-Clause",
+  "engines": {
+    "vscode": "^1.59.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished",
+    "onCommand:vscstock.refresh",
+    "onCommand:vscstock.addStock",
+    "onCommand:vscstock.removeStock",
+    "onCommand:vscstock.toggleStatusBarIconVisibility"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "vscstock.refresh",
+        "title": "VSC Stock: 刷新状态栏行情",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "vscstock.addStock",
+        "title": "VSC Stock: 添加状态栏股票",
+        "icon": "$(add)"
+      },
+      {
+        "command": "vscstock.removeStock",
+        "title": "VSC Stock: 移除状态栏股票",
+        "icon": "$(remove)"
+      },
+      {
+        "command": "vscstock.toggleStatusBarIconVisibility",
+        "title": "VSC Stock: 显示/隐藏状态栏涨跌图标"
+      }
+    ],
+    "configuration": {
+      "title": "VSC Stock",
+      "properties": {
+        "vscstock.stocks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "其他状态栏股票代码，例如国内期货、海外期货或不属于 A 股/港股/美股分组的代码。"
+        },
+        "vscstock.aStocks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "000001",
+            "399001",
+            "399006",
+            "000300",
+            "000016",
+            "000688"
+          ],
+          "description": "A 股市场状态栏股票/指数代码，可省略 sh/sz/bj 前缀。"
+        },
+        "vscstock.hkStocks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "hsi",
+            "hstech",
+            "hscei",
+            "00700",
+            "09988",
+            "00981"
+          ],
+          "description": "港股市场状态栏股票/指数代码，可省略 hk 前缀。"
+        },
+        "vscstock.usStocks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "dji",
+            "ixic",
+            "inx",
+            "nvda",
+            "goog"
+          ],
+          "description": "美股市场状态栏股票/指数代码，可省略 usr_ 前缀。"
+        },
+        "vscstock.interval": {
+          "type": "number",
+          "default": 5000,
+          "minimum": 3000,
+          "description": "行情刷新间隔，单位毫秒，最小值 3000。"
+        },
+        "vscstock.maxStatusBarItems": {
+          "type": "number",
+          "default": 5,
+          "minimum": 1,
+          "description": "状态栏单页最多显示的股票数量，超过后分页滚动显示。"
+        },
+        "vscstock.scrollInterval": {
+          "type": "number",
+          "default": 5000,
+          "minimum": 1000,
+          "description": "状态栏分页滚动显示时间，单位毫秒。"
+        },
+        "vscstock.riseColor": {
+          "type": "string",
+          "default": "white",
+          "description": "上涨时状态栏文字颜色。"
+        },
+        "vscstock.fallColor": {
+          "type": "string",
+          "default": "#C9AD06",
+          "description": "下跌时状态栏文字颜色。"
+        },
+        "vscstock.hideStatusBar": {
+          "type": "boolean",
+          "default": false,
+          "description": "是否隐藏股票行情状态栏。"
+        },
+        "vscstock.hideStatusBarIcon": {
+          "type": "boolean",
+          "default": false,
+          "description": "是否隐藏状态栏涨跌图标。"
+        },
+        "vscstock.labelFormat": {
+          "type": "string",
+          "default": "「${name}」${price} ${icon}（${percent}）",
+          "description": "状态栏显示格式，可用字段：code、name、price、percent、updown、open、yestclose、high、low、time、icon、afterPrice、afterPercent、extendedLabel、extendedTime。"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "test": "npm run compile && node ./test/codeNormalizer.test.js && node ./test/stockService.test.js",
+    "package": "vsce package"
+  },
+  "dependencies": {
+    "iconv-lite": "^0.6.3"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/vscode": "1.59.0",
+    "@vscode/vsce": "^3.9.1",
+    "typescript": "^5.0.0"
+  },
+  "extensionKind": [
+    "ui",
+    "workspace"
+  ]
+}
