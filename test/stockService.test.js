@@ -56,11 +56,11 @@ assert.strictEqual(afterQuote.time, 'Jun 02 07:59PM EDT');
 assert.strictEqual(afterQuote.extendedLabel, '盘后');
 
 const closedQuote = service.parseUsStockQuote('usr_amd', amdParams, 'closed');
-assert.strictEqual(closedQuote.price, '518.75');
-assert.strictEqual(closedQuote.percent, '-0.53');
-assert.strictEqual(closedQuote.updown, '-2.79');
-assert.strictEqual(closedQuote.time, 'Jun 02 07:59PM EDT');
-assert.strictEqual(closedQuote.extendedLabel, '盘后');
+assert.strictEqual(closedQuote.price, '521.54');
+assert.strictEqual(closedQuote.percent, '+2.24');
+assert.strictEqual(closedQuote.updown, '11.41');
+assert.strictEqual(closedQuote.time, '2026-06-03 08:14:55');
+assert.strictEqual(closedQuote.afterPrice, '');
 
 const regularOnlyParams = [...amdParams];
 regularOnlyParams[21] = '0.0000';

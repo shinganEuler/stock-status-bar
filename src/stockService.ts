@@ -15,23 +15,30 @@ export class StockService {
     }
 
     const orderedCodes = codes.map((code) => this.toQueryCode(code));
+    const usMarketPhase = getUsMarketPhase();
     const hkCodes: string[] = [];
     const sinaCodes: string[] = [];
+    const skippedQuotes: StockQuote[] = [];
 
     for (const code of orderedCodes) {
       if (code.startsWith('hk')) {
         hkCodes.push(`hk${code.slice(2).toUpperCase()}`);
+      } else if (usMarketPhase === 'closed' && this.isUsQuoteCode(code)) {
+        skippedQuotes.push(this.noDataQuote(code, '当前数据源不支持美股夜盘行情'));
       } else {
         sinaCodes.push(code);
       }
     }
 
     const results = await Promise.allSettled([
-      this.getSinaQuotes(sinaCodes),
+      this.getSinaQuotes(sinaCodes, usMarketPhase),
       this.getTencentHKQuotes(hkCodes)
     ]);
 
-    const quotes = results.flatMap((result) => (result.status === 'fulfilled' ? result.value : []));
+    const quotes = [
+      ...results.flatMap((result) => (result.status === 'fulfilled' ? result.value : [])),
+      ...skippedQuotes
+    ];
     const quoteMap = new Map(quotes.map((quote) => [quote.code.toLowerCase(), quote]));
     return orderedCodes
       .map((code) => quoteMap.get(code.toLowerCase()))
@@ -48,7 +55,14 @@ export class StockService {
     return code;
   }
 
-  private async getSinaQuotes(codes: string[]): Promise<StockQuote[]> {
+  private isUsQuoteCode(code: string): boolean {
+    return /^(usr_|gb_)/.test(code);
+  }
+
+  private async getSinaQuotes(
+    codes: string[],
+    usMarketPhase = getUsMarketPhase()
+  ): Promise<StockQuote[]> {
     if (!codes.length) {
       return [];
     }
@@ -66,17 +80,19 @@ export class StockService {
     );
 
     if (/FAILED/.test(data) && codes.length > 1) {
-      const retryResults = await Promise.allSettled(codes.map((code) => this.getSinaQuotes([code])));
+      const retryResults = await Promise.allSettled(
+        codes.map((code) => this.getSinaQuotes([code], usMarketPhase))
+      );
       return retryResults.flatMap((result) => (result.status === 'fulfilled' ? result.value : []));
     }
 
     return data
       .split('";\n')
-      .map((line) => this.parseSinaLine(line))
+      .map((line) => this.parseSinaLine(line, usMarketPhase))
       .filter((quote): quote is StockQuote => Boolean(quote));
   }
 
-  private parseSinaLine(line: string): StockQuote | null {
+  private parseSinaLine(line: string, usMarketPhase = getUsMarketPhase()): StockQuote | null {
     const index = line.indexOf('="');
     if (index === -1) {
       return null;
@@ -98,7 +114,7 @@ export class StockService {
       return this.parseAStockQuote(code, params);
     }
     if (/^usr_/.test(code)) {
-      return this.parseUsStockQuote(code, params);
+      return this.parseUsStockQuote(code, params, usMarketPhase);
     }
     if (/^gb_/.test(code)) {
       return this.parseGbStockQuote(code, params);
@@ -205,7 +221,7 @@ export class StockService {
           yestclose = params[35];
         }
       }
-    } else if (phase === 'after' || phase === 'closed') {
+    } else if (phase === 'after') {
       if (hasExtendedQuote) {
         price = extendedPrice;
         afterPrice = extendedPrice;
