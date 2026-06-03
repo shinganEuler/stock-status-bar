@@ -3,14 +3,39 @@
   "displayName": "VSC Stock Status Bar",
   "description": "在 VS Code 状态栏显示股票实时行情的精简插件",
   "version": "0.1.4",
-  "publisher": "local",
+  "publisher": "shinganeuler",
   "license": "BSD-3-Clause",
+  "icon": "images/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shinganEuler/stock-status-bar.git"
+  },
+  "bugs": {
+    "url": "https://github.com/shinganEuler/stock-status-bar/issues"
+  },
+  "homepage": "https://github.com/shinganEuler/stock-status-bar",
   "engines": {
     "vscode": "^1.59.0"
   },
   "categories": [
     "Other"
   ],
+  "keywords": [
+    "stock",
+    "stocks",
+    "statusbar",
+    "quote",
+    "market",
+    "股票",
+    "行情",
+    "A股",
+    "港股",
+    "美股"
+  ],
+  "galleryBanner": {
+    "color": "#0c141d",
+    "theme": "dark"
+  },
   "activationEvents": [
     "onStartupFinished",
     "onCommand:vscstock.refresh",
@@ -147,6 +172,7 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "test": "npm run compile && node ./test/codeNormalizer.test.js && node ./test/stockService.test.js",
+    "generate:icon": "node scripts/render-icon.js",
     "package": "vsce package"
   },
   "dependencies": {
