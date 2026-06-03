@@ -1,12 +1,47 @@
-import { StatusBarAlignment, StatusBarItem, window } from 'vscode';
-import { getConfig } from './config';
-import { StockQuote } from './types';
+import { StatusBarAlignment, StatusBarItem, ThemeColor, window } from 'vscode';
+import { getConfig, getMarketVisibility, isStockVisibleByMarket } from './config';
+import { StockMarket, StockMarketVisibility, StockQuote } from './types';
 import { formatLabelString } from './utils';
 
 const DEFAULT_LABEL_FORMAT = '「${name}」${price} ${icon}（${percent}）';
+const MARKET_FILTER_PRIORITY_BASE = -10000;
+const MARKET_FILTER_COUNT = 3;
+const QUOTE_ITEM_PRIORITY_BASE = MARKET_FILTER_PRIORITY_BASE - MARKET_FILTER_COUNT;
+const ACTIVE_MARKET_COLOR = new ThemeColor('statusBar.foreground');
+const INACTIVE_MARKET_COLOR = new ThemeColor('disabledForeground');
+const MARKET_FILTERS: Array<{
+  market: StockMarket;
+  label: string;
+  name: string;
+  command: string;
+  priority: number;
+}> = [
+  {
+    market: 'a',
+    label: 'A',
+    name: 'A 股',
+    command: 'vscstock.toggleAStockMarketVisibility',
+    priority: MARKET_FILTER_PRIORITY_BASE
+  },
+  {
+    market: 'hk',
+    label: '港',
+    name: '港股',
+    command: 'vscstock.toggleHKStockMarketVisibility',
+    priority: MARKET_FILTER_PRIORITY_BASE - 1
+  },
+  {
+    market: 'us',
+    label: '美',
+    name: '美股',
+    command: 'vscstock.toggleUSStockMarketVisibility',
+    priority: MARKET_FILTER_PRIORITY_BASE - 2
+  }
+];
 
 export class StockStatusBar {
-  private items: StatusBarItem[] = [];
+  private quoteItems: StatusBarItem[] = [];
+  private marketItems = new Map<StockMarket, StatusBarItem>();
   private quotes: StockQuote[] = [];
   private pages: StockQuote[][] = [];
   private currentPage = 0;
@@ -14,28 +49,49 @@ export class StockStatusBar {
   private scrollTimerSignature = '';
 
   update(quotes: StockQuote[]): void {
-    if (getConfig('hideStatusBar', false) || !quotes.length) {
-      this.quotes = [];
-      this.pages = [];
-      this.stopScrolling();
+    if (getConfig('hideStatusBar', false)) {
       this.clear();
       return;
     }
 
     this.quotes = quotes;
-    this.rebuildPages();
-    this.currentPage = Math.min(this.currentPage, this.pageCount - 1);
-    this.renderCurrentPage();
-    this.configureScrolling();
+    this.renderMarketItems();
+    this.renderQuotes();
   }
 
-  showLoading(codes: string[]): void {
-    if (getConfig('hideStatusBar', false) || this.items.length) {
+  showControls(): void {
+    if (getConfig('hideStatusBar', false)) {
+      this.clear();
       return;
     }
 
-    this.ensureItemCount(1);
-    const item = this.items[0];
+    this.renderMarketItems();
+    this.clearQuotes();
+  }
+
+  refreshMarketFilters(visibility: StockMarketVisibility = getMarketVisibility()): void {
+    if (getConfig('hideStatusBar', false)) {
+      this.clear();
+      return;
+    }
+
+    this.renderMarketItems(visibility);
+    this.renderQuotes(visibility);
+  }
+
+  showLoading(codes: string[]): void {
+    if (getConfig('hideStatusBar', false)) {
+      this.clear();
+      return;
+    }
+
+    this.renderMarketItems();
+    if (this.quoteItems.length) {
+      return;
+    }
+
+    this.ensureQuoteItemCount(1);
+    const item = this.quoteItems[0];
     item.text = '$(sync~spin) 股票行情';
     item.tooltip = `正在刷新：${codes.join(', ')}`;
     item.command = 'vscstock.refresh';
@@ -48,11 +104,12 @@ export class StockStatusBar {
       return;
     }
 
+    this.renderMarketItems();
     this.quotes = [];
     this.pages = [];
     this.stopScrolling();
-    this.ensureItemCount(1);
-    const item = this.items[0];
+    this.ensureQuoteItemCount(1);
+    const item = this.quoteItems[0];
     item.text = `$(warning) ${message}`;
     item.tooltip = `股票代码：${codes.join(', ')}`;
     item.color = getConfig('fallColor', '#C9AD06');
@@ -61,12 +118,9 @@ export class StockStatusBar {
   }
 
   clear(): void {
-    this.stopScrolling();
-    this.quotes = [];
-    this.pages = [];
-    this.currentPage = 0;
-    this.items.forEach((item) => item.dispose());
-    this.items = [];
+    this.clearQuotes();
+    this.marketItems.forEach((item) => item.dispose());
+    this.marketItems.clear();
   }
 
   dispose(): void {
@@ -85,10 +139,43 @@ export class StockStatusBar {
     return Math.max(1000, Math.floor(getConfig('scrollInterval', 5000)));
   }
 
+  private renderMarketItems(visibility: StockMarketVisibility = getMarketVisibility()): void {
+    for (const filter of MARKET_FILTERS) {
+      let item = this.marketItems.get(filter.market);
+      if (!item) {
+        item = window.createStatusBarItem(StatusBarAlignment.Left, filter.priority);
+        this.marketItems.set(filter.market, item);
+      }
+
+      const enabled = visibility[filter.market];
+      item.text = filter.label;
+      item.tooltip = `${enabled ? '点击隐藏' : '点击显示'}${filter.name}状态栏股票`;
+      item.color = enabled ? ACTIVE_MARKET_COLOR : INACTIVE_MARKET_COLOR;
+      item.command = filter.command;
+      item.show();
+    }
+  }
+
+  private renderQuotes(visibility: StockMarketVisibility = getMarketVisibility()): void {
+    this.rebuildPages(visibility);
+
+    if (!this.pages.length) {
+      this.stopScrolling();
+      this.currentPage = 0;
+      this.ensureQuoteItemCount(0);
+      return;
+    }
+
+    this.currentPage = Math.min(this.currentPage, this.pageCount - 1);
+    this.renderCurrentPage();
+    this.configureScrolling();
+  }
+
   private renderCurrentPage(): void {
     const visibleQuotes = this.pages[this.currentPage] || [];
-    this.ensureItemCount(visibleQuotes.length);
-    visibleQuotes.forEach((quote, index) => this.updateItem(this.items[index], quote));
+
+    this.ensureQuoteItemCount(visibleQuotes.length);
+    visibleQuotes.forEach((quote, index) => this.updateItem(this.quoteItems[index], quote));
   }
 
   private configureScrolling(): void {
@@ -128,11 +215,15 @@ export class StockStatusBar {
     this.renderCurrentPage();
   }
 
-  private rebuildPages(): void {
+  private rebuildPages(visibility: StockMarketVisibility = getMarketVisibility()): void {
     const pages: StockQuote[][] = [];
     let currentPage: StockQuote[] = [];
 
-    for (const quote of this.quotes) {
+    const visibleQuotes = this.quotes.filter((quote) =>
+      isStockVisibleByMarket(quote.code, visibility)
+    );
+
+    for (const quote of visibleQuotes) {
       if (currentPage.length >= this.maxVisibleItems) {
         pages.push(currentPage);
         currentPage = [];
@@ -149,14 +240,28 @@ export class StockStatusBar {
     this.currentPage = Math.min(this.currentPage, this.pageCount - 1);
   }
 
-  private ensureItemCount(count: number): void {
-    while (this.items.length < count) {
-      this.items.push(window.createStatusBarItem(StatusBarAlignment.Left, 3));
+  private ensureQuoteItemCount(count: number): void {
+    while (this.quoteItems.length < count) {
+      this.quoteItems.push(
+        window.createStatusBarItem(
+          StatusBarAlignment.Left,
+          QUOTE_ITEM_PRIORITY_BASE - this.quoteItems.length
+        )
+      );
     }
 
-    while (this.items.length > count) {
-      this.items.pop()?.dispose();
+    while (this.quoteItems.length > count) {
+      this.quoteItems.pop()?.dispose();
     }
+  }
+
+  private clearQuotes(): void {
+    this.stopScrolling();
+    this.quotes = [];
+    this.pages = [];
+    this.currentPage = 0;
+    this.quoteItems.forEach((item) => item.dispose());
+    this.quoteItems = [];
   }
 
   private updateItem(item: StatusBarItem, quote: StockQuote): void {

@@ -19,6 +19,15 @@ export function getStockGroupConfigKey(code: string): StockGroupConfigKey {
   if (/^(usr_|gb_)/i.test(normalized)) {
     return 'usStocks';
   }
+  if (/^\d{6}$/.test(normalized)) {
+    return 'aStocks';
+  }
+  if (/^\d{5}$/.test(normalized) || HK_INDEX_CODES.has(normalized.toLowerCase())) {
+    return 'hkStocks';
+  }
+  if (isLikelyUsStockSymbol(normalized)) {
+    return 'usStocks';
+  }
   return 'stocks';
 }
 

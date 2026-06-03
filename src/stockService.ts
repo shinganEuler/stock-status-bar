@@ -33,7 +33,6 @@ export class StockService {
 
     const quotes = results.flatMap((result) => (result.status === 'fulfilled' ? result.value : []));
     const quoteMap = new Map(quotes.map((quote) => [quote.code.toLowerCase(), quote]));
-
     return orderedCodes
       .map((code) => quoteMap.get(code.toLowerCase()))
       .filter((quote): quote is StockQuote => Boolean(quote));
@@ -55,10 +54,16 @@ export class StockService {
     }
 
     const url = `https://hq.sinajs.cn/list=${codes.map((code) => code.replace('.', '$')).join(',')}`;
-    const data = await requestText(url, 'GB18030', {
-      ...randHeader(),
-      Referer: 'http://finance.sina.com.cn/'
-    });
+    const data = await requestText(
+      url,
+      'GB18030',
+      {
+        ...randHeader(),
+        Referer: 'http://finance.sina.com.cn/'
+      },
+      0,
+      true
+    );
 
     if (/FAILED/.test(data) && codes.length > 1) {
       const retryResults = await Promise.allSettled(codes.map((code) => this.getSinaQuotes([code])));

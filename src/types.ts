@@ -20,4 +20,8 @@ export interface StockQuote {
   error?: string;
 }
 
+export type StockMarket = 'a' | 'hk' | 'us';
+
+export type StockMarketVisibility = Record<StockMarket, boolean>;
+
 export type UsMarketPhase = 'pre' | 'main' | 'after' | 'closed';

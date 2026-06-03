@@ -2,7 +2,7 @@
   "name": "stock-status-bar",
   "displayName": "VSC Stock Status Bar",
   "description": "在 VS Code 状态栏显示股票实时行情的精简插件",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "publisher": "shinganeuler",
   "license": "BSD-3-Clause",
   "icon": "images/icon.png",
@@ -41,7 +41,10 @@
     "onCommand:vscstock.refresh",
     "onCommand:vscstock.addStock",
     "onCommand:vscstock.removeStock",
-    "onCommand:vscstock.toggleStatusBarIconVisibility"
+    "onCommand:vscstock.toggleStatusBarIconVisibility",
+    "onCommand:vscstock.toggleAStockMarketVisibility",
+    "onCommand:vscstock.toggleHKStockMarketVisibility",
+    "onCommand:vscstock.toggleUSStockMarketVisibility"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -64,6 +67,18 @@
       {
         "command": "vscstock.toggleStatusBarIconVisibility",
         "title": "VSC Stock: 显示/隐藏状态栏涨跌图标"
+      },
+      {
+        "command": "vscstock.toggleAStockMarketVisibility",
+        "title": "VSC Stock: 显示/隐藏 A 股状态栏股票"
+      },
+      {
+        "command": "vscstock.toggleHKStockMarketVisibility",
+        "title": "VSC Stock: 显示/隐藏港股状态栏股票"
+      },
+      {
+        "command": "vscstock.toggleUSStockMarketVisibility",
+        "title": "VSC Stock: 显示/隐藏美股状态栏股票"
       }
     ],
     "configuration": {
@@ -126,6 +141,32 @@
           "default": 5000,
           "minimum": 3000,
           "description": "行情刷新间隔，单位毫秒，最小值 3000。"
+        },
+        "vscstock.marketVisibility": {
+          "type": "object",
+          "default": {
+            "a": true,
+            "hk": true,
+            "us": true
+          },
+          "properties": {
+            "a": {
+              "type": "boolean",
+              "default": true,
+              "description": "是否显示 A 股市场状态栏股票。"
+            },
+            "hk": {
+              "type": "boolean",
+              "default": true,
+              "description": "是否显示港股市场状态栏股票。"
+            },
+            "us": {
+              "type": "boolean",
+              "default": true,
+              "description": "是否显示美股市场状态栏股票。"
+            }
+          },
+          "description": "状态栏市场显示开关，状态栏 A/港/美 按钮会同步修改此配置。"
         },
         "vscstock.maxStatusBarItems": {
           "type": "number",

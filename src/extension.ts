@@ -1,7 +1,18 @@
 import { commands, ExtensionContext, window, workspace } from 'vscode';
-import { addStocks, CONFIG_NAMESPACE, getConfig, getStocks, removeStocks, setConfig } from './config';
+import {
+  addStocks,
+  CONFIG_NAMESPACE,
+  getConfig,
+  getMarketVisibility,
+  getStocks,
+  getVisibleStocks,
+  removeStocks,
+  setConfig,
+  toggleMarketVisibility
+} from './config';
 import { StockService } from './stockService';
 import { StockStatusBar } from './statusBar';
+import { StockMarketVisibility } from './types';
 
 let timer: NodeJS.Timeout | null = null;
 let refreshing = false;
@@ -10,7 +21,7 @@ export async function activate(context: ExtensionContext): Promise<void> {
   const service = new StockService();
   const statusBar = new StockStatusBar();
 
-  const refresh = async () => {
+  const refresh = async (visibility?: StockMarketVisibility) => {
     if (refreshing) {
       return;
     }
@@ -20,9 +31,16 @@ export async function activate(context: ExtensionContext): Promise<void> {
       return;
     }
 
-    const stocks = getStocks();
-    if (!stocks.length) {
+    const allStocks = getStocks();
+    if (!allStocks.length) {
       statusBar.clear();
+      return;
+    }
+
+    const marketVisibility = visibility || getMarketVisibility();
+    const stocks = getVisibleStocks(marketVisibility);
+    if (!stocks.length) {
+      statusBar.showControls();
       return;
     }
 
@@ -94,6 +112,21 @@ export async function activate(context: ExtensionContext): Promise<void> {
     commands.registerCommand('vscstock.toggleStatusBarIconVisibility', async () => {
       await setConfig('hideStatusBarIcon', !getConfig('hideStatusBarIcon', false));
       await refresh();
+    }),
+    commands.registerCommand('vscstock.toggleAStockMarketVisibility', async () => {
+      const visibility = await toggleMarketVisibility('a');
+      statusBar.refreshMarketFilters(visibility);
+      await refresh(visibility);
+    }),
+    commands.registerCommand('vscstock.toggleHKStockMarketVisibility', async () => {
+      const visibility = await toggleMarketVisibility('hk');
+      statusBar.refreshMarketFilters(visibility);
+      await refresh(visibility);
+    }),
+    commands.registerCommand('vscstock.toggleUSStockMarketVisibility', async () => {
+      const visibility = await toggleMarketVisibility('us');
+      statusBar.refreshMarketFilters(visibility);
+      await refresh(visibility);
     }),
     workspace.onDidChangeConfiguration((event) => {
       if (event.affectsConfiguration(CONFIG_NAMESPACE)) {

@@ -2,6 +2,9 @@ import * as http from 'http';
 import * as https from 'https';
 import { decode } from 'iconv-lite';
 
+const directHttpAgent = new http.Agent({ keepAlive: false });
+const directHttpsAgent = new https.Agent({ keepAlive: false });
+
 export function calcFixedPriceNumber(
   open = '0',
   yestclose = '0',
@@ -73,14 +76,21 @@ export function requestText(
   url: string,
   encoding = 'utf8',
   headers: Record<string, string> = {},
-  redirectCount = 0
+  redirectCount = 0,
+  direct = false
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const target = new URL(url);
     const client = target.protocol === 'https:' ? https : http;
+    const agent = direct
+      ? target.protocol === 'https:'
+        ? directHttpsAgent
+        : directHttpAgent
+      : undefined;
     const request = client.get(
       target,
       {
+        agent,
         headers,
         timeout: 15000
       },
@@ -91,7 +101,10 @@ export function requestText(
         if (statusCode >= 300 && statusCode < 400 && location && redirectCount < 3) {
           response.resume();
           const redirectUrl = new URL(location, url).toString();
-          requestText(redirectUrl, encoding, headers, redirectCount + 1).then(resolve, reject);
+          requestText(redirectUrl, encoding, headers, redirectCount + 1, direct).then(
+            resolve,
+            reject
+          );
           return;
         }
 

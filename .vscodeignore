@@ -3,6 +3,7 @@
 src/**
 scripts/**
 .gitignore
+AGENTS.md
 tsconfig.json
 **/*.map
 **/*.ts

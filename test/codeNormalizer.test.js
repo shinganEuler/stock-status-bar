@@ -1,5 +1,6 @@
 const assert = require('assert');
 const {
+  getStockGroupConfigKey,
   normalizeStockCode,
   normalizeStockCodeForAdd,
   normalizeStockCodeForGroup,
@@ -50,5 +51,14 @@ assert.deepStrictEqual(normalizeStockCodes(['sh000001', 'SH000001', ' hk00700 ']
   'sh000001',
   'hk00700'
 ]);
+
+assert.strictEqual(getStockGroupConfigKey('sh600519'), 'aStocks');
+assert.strictEqual(getStockGroupConfigKey('000001'), 'aStocks');
+assert.strictEqual(getStockGroupConfigKey('hk00700'), 'hkStocks');
+assert.strictEqual(getStockGroupConfigKey('00700'), 'hkStocks');
+assert.strictEqual(getStockGroupConfigKey('hsi'), 'hkStocks');
+assert.strictEqual(getStockGroupConfigKey('usr_tsla'), 'usStocks');
+assert.strictEqual(getStockGroupConfigKey('dji'), 'usStocks');
+assert.strictEqual(getStockGroupConfigKey('nf_IF0'), 'stocks');
 
 console.log('codeNormalizer tests passed');

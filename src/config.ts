@@ -1,5 +1,6 @@
 import { workspace } from 'vscode';
 import {
+  getStockGroupConfigKey,
   normalizeStockCode,
   normalizeStockCodeForAdd,
   normalizeStockCodeForGroup,
@@ -7,12 +8,19 @@ import {
   normalizeStockCodesForGroup,
   StockGroupConfigKey
 } from './codeNormalizer';
+import { StockMarket, StockMarketVisibility } from './types';
 
 export const CONFIG_NAMESPACE = 'vscstock';
 
 const DEFAULT_A_STOCKS = ['000001', '399001', '399006', '000300', '000016', '000688'];
 const DEFAULT_HK_STOCKS = ['hsi', 'hstech', 'hscei'];
 const DEFAULT_US_STOCKS = ['dji', 'ixic', 'inx'];
+const DEFAULT_MARKET_VISIBILITY: StockMarketVisibility = { a: true, hk: true, us: true };
+const STOCK_GROUP_MARKETS: Partial<Record<StockGroupConfigKey, StockMarket>> = {
+  aStocks: 'a',
+  hkStocks: 'hk',
+  usStocks: 'us'
+};
 
 export function getConfig<T>(key: string, defaultValue: T): T {
   return workspace.getConfiguration(CONFIG_NAMESPACE).get<T>(key, defaultValue);
@@ -24,12 +32,20 @@ export async function setConfig<T>(key: string, value: T): Promise<void> {
 
 export function getStocks(): string[] {
   const groups = getStockGroups();
-  return normalizeStockCodes([
-    ...groups.aStocks,
-    ...groups.hkStocks,
-    ...groups.usStocks,
-    ...groups.stocks,
-  ]);
+  return normalizeStockCodes(getOrderedStocks(groups));
+}
+
+export function getVisibleStocks(
+  visibility: StockMarketVisibility = getMarketVisibility()
+): string[] {
+  const groups = getStockGroups();
+  const groupStocks = getOrderedGroupStocks(groups, visibility);
+  const legacyStocks = getVisibleLegacyStocks(groups.stocks, visibility);
+  const preferLegacyStocks = shouldPreferLegacyStocks(groups.stocks);
+
+  return normalizeStockCodes(
+    preferLegacyStocks ? [...legacyStocks, ...groupStocks] : [...groupStocks, ...legacyStocks]
+  );
 }
 
 export async function setStocks(stocks: string[]): Promise<void> {
@@ -49,6 +65,100 @@ export function getStockGroups(): Record<StockGroupConfigKey, string[]> {
     ),
     stocks: normalizeStockCodes(getConfig<string[]>('stocks', [])),
   };
+}
+
+export function getMarketVisibility(): StockMarketVisibility {
+  const raw = getConfig<Partial<StockMarketVisibility>>(
+    'marketVisibility',
+    DEFAULT_MARKET_VISIBILITY
+  );
+
+  return {
+    a: raw?.a !== false,
+    hk: raw?.hk !== false,
+    us: raw?.us !== false
+  };
+}
+
+export function isStockVisibleByMarket(
+  code: string,
+  visibility: StockMarketVisibility = getMarketVisibility()
+): boolean {
+  const market = STOCK_GROUP_MARKETS[getStockGroupConfigKey(code)];
+  return !market || visibility[market];
+}
+
+export async function toggleMarketVisibility(
+  market: StockMarket
+): Promise<StockMarketVisibility> {
+  const visibility = getMarketVisibility();
+  const nextVisibility = {
+    ...visibility,
+    [market]: !visibility[market]
+  };
+
+  await setConfig('marketVisibility', nextVisibility);
+  return nextVisibility;
+}
+
+function normalizeStockCodeByDetectedMarket(code: string): string {
+  const key = getStockGroupConfigKey(code);
+  if (key === 'stocks') {
+    return normalizeStockCode(code);
+  }
+  return normalizeStockCodeForGroup(key, code);
+}
+
+function getOrderedStocks(groups: Record<StockGroupConfigKey, string[]>): string[] {
+  const groupStocks = [
+    ...groups.aStocks,
+    ...groups.hkStocks,
+    ...groups.usStocks
+  ];
+
+  return shouldPreferLegacyStocks(groups.stocks)
+    ? [...groups.stocks, ...groupStocks]
+    : [...groupStocks, ...groups.stocks];
+}
+
+function getOrderedGroupStocks(
+  groups: Record<StockGroupConfigKey, string[]>,
+  visibility: StockMarketVisibility
+): string[] {
+  return [
+    ...(visibility.a ? groups.aStocks : []),
+    ...(visibility.hk ? groups.hkStocks : []),
+    ...(visibility.us ? groups.usStocks : [])
+  ];
+}
+
+function getVisibleLegacyStocks(
+  stocks: string[],
+  visibility: StockMarketVisibility
+): string[] {
+  return stocks
+    .filter((code) => isStockVisibleByMarket(code, visibility))
+    .map(normalizeStockCodeByDetectedMarket);
+}
+
+function shouldPreferLegacyStocks(stocks: string[]): boolean {
+  return (
+    stocks.length > 0 &&
+    hasConfiguredValue('stocks') &&
+    !hasConfiguredValue('aStocks') &&
+    !hasConfiguredValue('hkStocks') &&
+    !hasConfiguredValue('usStocks')
+  );
+}
+
+function hasConfiguredValue(key: string): boolean {
+  const inspected = workspace.getConfiguration(CONFIG_NAMESPACE).inspect<unknown>(key);
+  return Boolean(
+    inspected &&
+      (inspected.globalValue !== undefined ||
+        inspected.workspaceValue !== undefined ||
+        inspected.workspaceFolderValue !== undefined)
+  );
 }
 
 export async function addStocks(stocks: string[]): Promise<void> {
