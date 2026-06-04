@@ -12,13 +12,16 @@ import {
 } from './config';
 import { StockService } from './stockService';
 import { StockStatusBar } from './statusBar';
-import { StockMarketVisibility } from './types';
+import { StockMarketVisibility, StockQuote } from './types';
 
 let timer: NodeJS.Timeout | null = null;
 let refreshing = false;
+const LAST_QUOTES_STORAGE_KEY = 'lastQuotes';
 
 export async function activate(context: ExtensionContext): Promise<void> {
-  const service = new StockService();
+  const service = new StockService(
+    context.globalState.get<StockQuote[]>(LAST_QUOTES_STORAGE_KEY, [])
+  );
   const statusBar = new StockStatusBar();
 
   const refresh = async (visibility?: StockMarketVisibility) => {
@@ -49,6 +52,7 @@ export async function activate(context: ExtensionContext): Promise<void> {
     try {
       const quotes = await service.getQuotes(stocks);
       if (quotes.length) {
+        await context.globalState.update(LAST_QUOTES_STORAGE_KEY, service.getCachedQuotes());
         statusBar.update(quotes);
       } else {
         statusBar.showError('股票行情暂无数据', stocks);

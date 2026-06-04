@@ -75,4 +75,17 @@ assert.strictEqual(regularOnlyClosedQuote.updown, '11.41');
 assert.strictEqual(regularOnlyClosedQuote.time, '2026-06-03 08:14:55');
 assert.strictEqual(regularOnlyClosedQuote.afterPrice, '');
 
+const cachedService = new StockService([afterQuote]);
+const cachedNightQuote = cachedService.getCachedOrNoDataQuote('usr_amd', '当前数据源不支持美股夜盘行情');
+assert.strictEqual(cachedNightQuote.price, '518.75');
+assert.strictEqual(cachedNightQuote.percent, '-0.53');
+assert.strictEqual(cachedNightQuote.updown, '-2.79');
+assert.strictEqual(cachedNightQuote.time, 'Jun 02 07:59PM EDT');
+assert.strictEqual(cachedNightQuote.error, undefined);
+
+const persistedQuotes = cachedService.getCachedQuotes();
+assert.strictEqual(persistedQuotes.length, 1);
+assert.strictEqual(persistedQuotes[0].code, 'usr_amd');
+assert.strictEqual(persistedQuotes[0].price, '518.75');
+
 console.log('stockService tests passed');

@@ -9,6 +9,16 @@ import {
 } from './utils';
 
 export class StockService {
+  private readonly cachedQuotes = new Map<string, StockQuote>();
+
+  constructor(initialQuotes: StockQuote[] = []) {
+    this.rememberQuotes(initialQuotes);
+  }
+
+  getCachedQuotes(): StockQuote[] {
+    return Array.from(this.cachedQuotes.values()).map((quote) => ({ ...quote }));
+  }
+
   async getQuotes(codes: string[]): Promise<StockQuote[]> {
     if (!codes.length) {
       return [];
@@ -24,7 +34,7 @@ export class StockService {
       if (code.startsWith('hk')) {
         hkCodes.push(`hk${code.slice(2).toUpperCase()}`);
       } else if (usMarketPhase === 'closed' && this.isUsQuoteCode(code)) {
-        skippedQuotes.push(this.noDataQuote(code, '当前数据源不支持美股夜盘行情'));
+        skippedQuotes.push(this.getCachedOrNoDataQuote(code, '当前数据源不支持美股夜盘行情'));
       } else {
         sinaCodes.push(code);
       }
@@ -35,8 +45,13 @@ export class StockService {
       this.getTencentHKQuotes(hkCodes)
     ]);
 
+    const fetchedQuotes = results.flatMap((result) =>
+      result.status === 'fulfilled' ? result.value : []
+    );
+    this.rememberQuotes(fetchedQuotes);
+
     const quotes = [
-      ...results.flatMap((result) => (result.status === 'fulfilled' ? result.value : [])),
+      ...fetchedQuotes,
       ...skippedQuotes
     ];
     const quoteMap = new Map(quotes.map((quote) => [quote.code.toLowerCase(), quote]));
@@ -57,6 +72,19 @@ export class StockService {
 
   private isUsQuoteCode(code: string): boolean {
     return /^(usr_|gb_)/.test(code);
+  }
+
+  private getCachedOrNoDataQuote(code: string, name: string): StockQuote {
+    const cached = this.cachedQuotes.get(code.toLowerCase());
+    return cached ? { ...cached } : this.noDataQuote(code, name);
+  }
+
+  private rememberQuotes(quotes: StockQuote[]): void {
+    for (const quote of quotes) {
+      if (!quote.error && quote.price !== '--') {
+        this.cachedQuotes.set(quote.code.toLowerCase(), { ...quote });
+      }
+    }
   }
 
   private async getSinaQuotes(
