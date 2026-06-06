@@ -28,15 +28,18 @@ export class StockService {
     const usMarketPhase = getUsMarketPhase();
     const hkCodes: string[] = [];
     const sinaCodes: string[] = [];
-    const skippedQuotes: StockQuote[] = [];
+    const fallbackQuotes: StockQuote[] = [];
 
     for (const code of orderedCodes) {
       if (code.startsWith('hk')) {
         hkCodes.push(`hk${code.slice(2).toUpperCase()}`);
-      } else if (usMarketPhase === 'closed' && this.isUsQuoteCode(code)) {
-        skippedQuotes.push(this.getCachedOrNoDataQuote(code, '当前数据源不支持美股夜盘行情'));
       } else {
         sinaCodes.push(code);
+        if (usMarketPhase === 'closed' && this.isUsQuoteCode(code)) {
+          fallbackQuotes.push(
+            this.getCachedOrNoDataQuote(code, '当前数据源不支持美股夜盘行情')
+          );
+        }
       }
     }
 
@@ -48,16 +51,24 @@ export class StockService {
     const fetchedQuotes = results.flatMap((result) =>
       result.status === 'fulfilled' ? result.value : []
     );
-    this.rememberQuotes(fetchedQuotes);
 
-    const quotes = [
-      ...fetchedQuotes,
-      ...skippedQuotes
-    ];
-    const quoteMap = new Map(quotes.map((quote) => [quote.code.toLowerCase(), quote]));
-    return orderedCodes
-      .map((code) => quoteMap.get(code.toLowerCase()))
+    const quoteMap = new Map(fetchedQuotes.map((quote) => [quote.code.toLowerCase(), quote]));
+    const fallbackQuoteMap = new Map(
+      fallbackQuotes.map((quote) => [quote.code.toLowerCase(), quote])
+    );
+    const quotes = orderedCodes
+      .map((code) => {
+        const key = code.toLowerCase();
+        const quote = quoteMap.get(key);
+        const fallbackQuote = fallbackQuoteMap.get(key);
+        return usMarketPhase === 'closed' && this.isUsQuoteCode(code)
+          ? this.selectClosedUsQuote(quote, fallbackQuote)
+          : quote;
+      })
       .filter((quote): quote is StockQuote => Boolean(quote));
+
+    this.rememberQuotes(quotes);
+    return quotes;
   }
 
   private toQueryCode(code: string): string {
@@ -77,6 +88,35 @@ export class StockService {
   private getCachedOrNoDataQuote(code: string, name: string): StockQuote {
     const cached = this.cachedQuotes.get(code.toLowerCase());
     return cached ? { ...cached } : this.noDataQuote(code, name);
+  }
+
+  private selectClosedUsQuote(
+    quote: StockQuote | undefined,
+    fallbackQuote: StockQuote | undefined
+  ): StockQuote | undefined {
+    if (!quote) {
+      return fallbackQuote;
+    }
+    if (!fallbackQuote) {
+      return quote;
+    }
+
+    const isUsExtendedQuote = (value: StockQuote) =>
+      !value.error && value.extendedLabel === '盘后' && Boolean(value.afterPrice);
+
+    if (isUsExtendedQuote(quote)) {
+      return quote;
+    }
+    if (isUsExtendedQuote(fallbackQuote)) {
+      return fallbackQuote;
+    }
+    if (quote.error && !fallbackQuote.error) {
+      return fallbackQuote;
+    }
+    if (!quote.error) {
+      return quote;
+    }
+    return fallbackQuote;
   }
 
   private rememberQuotes(quotes: StockQuote[]): void {
@@ -249,7 +289,7 @@ export class StockService {
           yestclose = params[35];
         }
       }
-    } else if (phase === 'after') {
+    } else if (phase === 'after' || phase === 'closed') {
       if (hasExtendedQuote) {
         price = extendedPrice;
         afterPrice = extendedPrice;

@@ -1,5 +1,6 @@
 const assert = require('assert');
 const { StockService } = require('../out/stockService');
+const utils = require('../out/utils');
 
 const amdParams = [
   'AMD',
@@ -56,11 +57,11 @@ assert.strictEqual(afterQuote.time, 'Jun 02 07:59PM EDT');
 assert.strictEqual(afterQuote.extendedLabel, '盘后');
 
 const closedQuote = service.parseUsStockQuote('usr_amd', amdParams, 'closed');
-assert.strictEqual(closedQuote.price, '521.54');
-assert.strictEqual(closedQuote.percent, '+2.24');
-assert.strictEqual(closedQuote.updown, '11.41');
-assert.strictEqual(closedQuote.time, '2026-06-03 08:14:55');
-assert.strictEqual(closedQuote.afterPrice, '');
+assert.strictEqual(closedQuote.price, '518.75');
+assert.strictEqual(closedQuote.percent, '-0.53');
+assert.strictEqual(closedQuote.updown, '-2.79');
+assert.strictEqual(closedQuote.time, 'Jun 02 07:59PM EDT');
+assert.strictEqual(closedQuote.extendedLabel, '盘后');
 
 const regularOnlyParams = [...amdParams];
 regularOnlyParams[21] = '0.0000';
@@ -76,6 +77,10 @@ assert.strictEqual(regularOnlyClosedQuote.time, '2026-06-03 08:14:55');
 assert.strictEqual(regularOnlyClosedQuote.afterPrice, '');
 
 const cachedService = new StockService([afterQuote]);
+const selectedClosedQuote = cachedService.selectClosedUsQuote(regularOnlyClosedQuote, afterQuote);
+assert.strictEqual(selectedClosedQuote.price, '518.75');
+assert.strictEqual(selectedClosedQuote.extendedLabel, '盘后');
+
 const cachedNightQuote = cachedService.getCachedOrNoDataQuote('usr_amd', '当前数据源不支持美股夜盘行情');
 assert.strictEqual(cachedNightQuote.price, '518.75');
 assert.strictEqual(cachedNightQuote.percent, '-0.53');
@@ -88,4 +93,31 @@ assert.strictEqual(persistedQuotes.length, 1);
 assert.strictEqual(persistedQuotes[0].code, 'usr_amd');
 assert.strictEqual(persistedQuotes[0].price, '518.75');
 
-console.log('stockService tests passed');
+const originalGetUsMarketPhase = utils.getUsMarketPhase;
+
+(async () => {
+  try {
+    utils.getUsMarketPhase = () => 'closed';
+
+    const closedService = new StockService([afterQuote]);
+    closedService.getSinaQuotes = async () => [regularOnlyClosedQuote];
+    closedService.getTencentHKQuotes = async () => [];
+
+    const quotes = await closedService.getQuotes(['usr_amd']);
+    assert.strictEqual(quotes.length, 1);
+    assert.strictEqual(quotes[0].price, '518.75');
+    assert.strictEqual(quotes[0].extendedLabel, '盘后');
+
+    const closedPersistedQuotes = closedService.getCachedQuotes();
+    assert.strictEqual(closedPersistedQuotes.length, 1);
+    assert.strictEqual(closedPersistedQuotes[0].price, '518.75');
+    assert.strictEqual(closedPersistedQuotes[0].extendedLabel, '盘后');
+  } finally {
+    utils.getUsMarketPhase = originalGetUsMarketPhase;
+  }
+
+  console.log('stockService tests passed');
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

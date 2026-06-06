@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.8
+
+- Show the last US after-hours price during the unsupported overnight session when Sina returns extended-session data.
+- Preserve cached US after-hours quotes during the overnight session when the live response only has the regular-session price.
+
 ## 0.1.5
 
 - Add A/HK/US status bar market filter buttons.

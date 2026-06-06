@@ -2,7 +2,7 @@
   "name": "stock-status-bar",
   "displayName": "VSC Stock Status Bar",
   "description": "在 VS Code 状态栏显示股票实时行情的精简插件",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "publisher": "shinganeuler",
   "license": "BSD-3-Clause",
   "icon": "images/icon.png",
