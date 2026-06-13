@@ -12,6 +12,7 @@ import {
 } from './config';
 import { StockService } from './stockService';
 import { StockStatusBar } from './statusBar';
+import { SharedQuoteCache } from './sharedQuoteCache';
 import { StockMarketVisibility, StockQuote } from './types';
 
 let timer: NodeJS.Timeout | null = null;
@@ -22,6 +23,7 @@ export async function activate(context: ExtensionContext): Promise<void> {
   const service = new StockService(
     context.globalState.get<StockQuote[]>(LAST_QUOTES_STORAGE_KEY, [])
   );
+  const sharedCache = new SharedQuoteCache(context.globalStorageUri.fsPath);
   const statusBar = new StockStatusBar();
 
   const refresh = async (visibility?: StockMarketVisibility) => {
@@ -50,8 +52,10 @@ export async function activate(context: ExtensionContext): Promise<void> {
     refreshing = true;
     statusBar.showLoading(stocks);
     try {
-      const quotes = await service.getQuotes(stocks);
+      const interval = Math.max(getConfig('interval', 5000), 3000);
+      const quotes = await sharedCache.getQuotes(stocks, interval, () => service.getQuotes(stocks));
       if (quotes.length) {
+        service.rememberQuotes(quotes);
         await context.globalState.update(LAST_QUOTES_STORAGE_KEY, service.getCachedQuotes());
         statusBar.update(quotes);
       } else {

@@ -119,7 +119,7 @@ export class StockService {
     return fallbackQuote;
   }
 
-  private rememberQuotes(quotes: StockQuote[]): void {
+  rememberQuotes(quotes: StockQuote[]): void {
     for (const quote of quotes) {
       if (!quote.error && quote.price !== '--') {
         this.cachedQuotes.set(quote.code.toLowerCase(), { ...quote });

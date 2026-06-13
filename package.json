@@ -2,7 +2,7 @@
   "name": "stock-status-bar",
   "displayName": "VSC Stock Status Bar",
   "description": "在 VS Code 状态栏显示股票实时行情的精简插件",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "publisher": "shinganeuler",
   "license": "BSD-3-Clause",
   "icon": "images/icon.png",
@@ -212,7 +212,7 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "test": "npm run compile && node ./test/codeNormalizer.test.js && node ./test/stockService.test.js",
+    "test": "npm run compile && node ./test/codeNormalizer.test.js && node ./test/stockService.test.js && node ./test/sharedQuoteCache.test.js",
     "generate:icon": "node scripts/render-icon.js",
     "package": "vsce package"
   },

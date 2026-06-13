@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.9
+
+- Share quote refresh results across VS Code windows to reduce duplicate data-source requests.
+
 ## 0.1.8
 
 - Show the last US after-hours price during the unsupported overnight session when Sina returns extended-session data.
